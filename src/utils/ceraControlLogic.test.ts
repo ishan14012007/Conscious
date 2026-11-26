@@ -4,13 +4,16 @@ import {
   buildDriftAnalysisRequest,
   createDefaultAnalysisConfig,
   createDefaultControlsState,
+  createDefaultScopeInput,
   formatUnavailableOperationMessage,
   getSourceConnectionStatus,
+  hasMeaningfulScope,
   INTELLIGENCE_SOURCES,
+  resolveEffectiveScope,
   resolveNextAgentMode,
   toggleIntelligenceSource,
 } from './ceraControlLogic.ts';
-import type { ConsciousSessionState, WorkspaceContext } from '../types/forge.ts';
+import type { ConsciousSessionState, ForgeHostContext, WorkspaceContext } from '../types/forge.ts';
 
 test('default controls and analysis configuration preserve clean initial state', () => {
   const controls = createDefaultControlsState();
@@ -20,6 +23,7 @@ test('default controls and analysis configuration preserve clean initial state',
   assert.equal(controls.trackCursor, true);
   assert.equal(controls.motion, 'normal');
   assert.equal(analysis.depth, 'balanced');
+  assert.deepEqual(analysis.scopeInput, { kind: 'projectKey', value: '' });
   assert.deepEqual(analysis.selectedSources, [
     'jira',
     'confluence',
@@ -86,6 +90,7 @@ test('toggling sources updates DriftAnalysisRequest with selected sources and de
     {
       selectedSources: selected,
       depth: 'deep',
+      scopeInput: { kind: 'projectKey', value: '' },
     },
     {
       host: { mode: 'forge', product: 'jira' },
@@ -108,17 +113,56 @@ test('toggling sources updates DriftAnalysisRequest with selected sources and de
   // Re-enabling Teamwork Graph sets includeTeamworkGraph true
   const reEnabled = toggleIntelligenceSource(selected, 'teamwork-graph');
   const updatedRequest = buildDriftAnalysisRequest(
-    { selectedSources: reEnabled, depth: 'quick' },
+    {
+      selectedSources: reEnabled,
+      depth: 'quick',
+      scopeInput: { kind: 'issueKey', value: 'CON-42' },
+    },
     null,
   );
   assert.equal(updatedRequest.depth, 'quick');
   assert.equal(updatedRequest.includeTeamworkGraph, true);
+  assert.deepEqual(updatedRequest.scope, { issueKey: 'CON-42' });
   assert.deepEqual(updatedRequest.sources, [
     'jira',
     'confluence',
     'jsm',
     'teamwork-graph',
   ]);
+});
+
+test('scope resolution prefers active Jira context and enforces meaningful scope', () => {
+  assert.equal(hasMeaningfulScope({}), false);
+  assert.equal(hasMeaningfulScope({ projectKey: '   ' }), false);
+  assert.equal(hasMeaningfulScope({ projectKey: 'CON' }), true);
+  assert.equal(hasMeaningfulScope({ issueKey: 'CON-101' }), true);
+
+  const jiraHostContext: ForgeHostContext = {
+    mode: 'forge',
+    product: 'jira',
+    projectKey: 'CON',
+    issueKey: 'CON-101',
+  };
+
+  const defaultScopeInput = createDefaultScopeInput(jiraHostContext, null);
+  assert.deepEqual(defaultScopeInput, { kind: 'issueKey', value: 'CON-101' });
+
+  const resolvedScope = resolveEffectiveScope(
+    {
+      selectedSources: ['jira', 'confluence'],
+      depth: 'balanced',
+      scopeInput: { kind: 'spaceKey', value: '  ARCH  ' },
+    },
+    null,
+    jiraHostContext,
+  );
+
+  assert.deepEqual(resolvedScope, {
+    projectKey: 'CON',
+    issueKey: 'CON-101',
+    spaceKey: 'ARCH',
+  });
+  assert.equal(hasMeaningfulScope(resolvedScope), true);
 });
 
 test('unavailable backend operations report clear standalone or pending resolver messages', () => {

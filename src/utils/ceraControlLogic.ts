@@ -3,13 +3,17 @@ import type {
   AgentMode,
   AnalysisDepth,
   CeraAnalysisConfig,
+  CeraScopeInput,
+  DriftScopeKind,
   IntelligenceSourceId,
 } from '../types/agent.ts';
 import type {
   CeraOperationState,
   ConsciousSessionState,
   DriftAnalysisRequest,
+  DriftSourceScope,
   ForgeFailureStatus,
+  ForgeHostContext,
   ForgeNormalizedError,
   SourceConnectionStatus,
   WorkspaceContext,
@@ -46,6 +50,50 @@ export const ANALYSIS_DEPTH_OPTIONS: ReadonlyArray<{
   { id: 'deep', label: 'Deep' },
 ];
 
+export const DRIFT_SCOPE_OPTIONS: ReadonlyArray<{
+  id: DriftScopeKind;
+  label: string;
+  placeholder: string;
+}> = [
+  { id: 'projectKey', label: 'Jira Project', placeholder: 'e.g. CON' },
+  { id: 'issueKey', label: 'Jira Issue', placeholder: 'e.g. CON-142' },
+  { id: 'spaceKey', label: 'Confluence Space', placeholder: 'e.g. DOCS' },
+  { id: 'pageId', label: 'Confluence Page ID', placeholder: 'e.g. 983041' },
+  { id: 'repositorySlug', label: 'Bitbucket Repo', placeholder: 'e.g. conscious-core' },
+  { id: 'incidentKey', label: 'JSM Incident', placeholder: 'e.g. INC-408' },
+];
+
+export function createDefaultScopeInput(
+  hostContext: ForgeHostContext | null = null,
+  workspaceContext: WorkspaceContext | null = null,
+): CeraScopeInput {
+  if (hostContext?.issueKey) {
+    return { kind: 'issueKey', value: hostContext.issueKey };
+  }
+  if (workspaceContext?.projectKey) {
+    return { kind: 'projectKey', value: workspaceContext.projectKey };
+  }
+  if (hostContext?.projectKey) {
+    return { kind: 'projectKey', value: hostContext.projectKey };
+  }
+  if (workspaceContext?.spaceKey) {
+    return { kind: 'spaceKey', value: workspaceContext.spaceKey };
+  }
+  if (hostContext?.spaceKey) {
+    return { kind: 'spaceKey', value: hostContext.spaceKey };
+  }
+  if (hostContext?.pageId) {
+    return { kind: 'pageId', value: hostContext.pageId };
+  }
+  if (workspaceContext?.repositorySlug) {
+    return { kind: 'repositorySlug', value: workspaceContext.repositorySlug };
+  }
+  if (workspaceContext?.serviceId) {
+    return { kind: 'incidentKey', value: workspaceContext.serviceId };
+  }
+  return { kind: 'projectKey', value: '' };
+}
+
 export function createDefaultControlsState(): AgentControlsState {
   return {
     mode: 'standby',
@@ -56,10 +104,14 @@ export function createDefaultControlsState(): AgentControlsState {
   };
 }
 
-export function createDefaultAnalysisConfig(): CeraAnalysisConfig {
+export function createDefaultAnalysisConfig(
+  hostContext: ForgeHostContext | null = null,
+  workspaceContext: WorkspaceContext | null = null,
+): CeraAnalysisConfig {
   return {
     selectedSources: [...DEFAULT_SELECTED_SOURCES],
     depth: 'balanced',
+    scopeInput: createDefaultScopeInput(hostContext, workspaceContext),
   };
 }
 
@@ -125,25 +177,56 @@ export function getSourceConnectionStatus(
     : 'not_connected';
 }
 
+export function resolveEffectiveScope(
+  config: CeraAnalysisConfig,
+  workspaceContext: WorkspaceContext | null,
+  hostContext: ForgeHostContext | null = null,
+): DriftSourceScope {
+  const scope: DriftSourceScope = {
+    ...(hostContext?.projectKey ? { projectKey: hostContext.projectKey } : {}),
+    ...(hostContext?.issueKey ? { issueKey: hostContext.issueKey } : {}),
+    ...(hostContext?.spaceKey ? { spaceKey: hostContext.spaceKey } : {}),
+    ...(hostContext?.pageId ? { pageId: hostContext.pageId } : {}),
+    ...(workspaceContext?.projectKey
+      ? { projectKey: workspaceContext.projectKey }
+      : {}),
+    ...(workspaceContext?.spaceKey
+      ? { spaceKey: workspaceContext.spaceKey }
+      : {}),
+    ...(workspaceContext?.repositorySlug
+      ? { repositorySlug: workspaceContext.repositorySlug }
+      : {}),
+    ...(workspaceContext?.serviceId
+      ? { incidentKey: workspaceContext.serviceId }
+      : {}),
+  };
+
+  const trimmed = config.scopeInput.value.trim();
+  if (trimmed) {
+    scope[config.scopeInput.kind] = trimmed;
+  }
+
+  return scope;
+}
+
+export function hasMeaningfulScope(scope: DriftSourceScope): boolean {
+  return Boolean(
+    scope.projectKey?.trim() ||
+      scope.issueKey?.trim() ||
+      scope.spaceKey?.trim() ||
+      scope.pageId?.trim() ||
+      scope.repositorySlug?.trim() ||
+      scope.incidentKey?.trim(),
+  );
+}
+
 export function buildDriftAnalysisRequest(
   config: CeraAnalysisConfig,
   workspaceContext: WorkspaceContext | null,
+  hostContext: ForgeHostContext | null = null,
 ): DriftAnalysisRequest {
   return {
-    scope: {
-      ...(workspaceContext?.projectKey
-        ? { projectKey: workspaceContext.projectKey }
-        : {}),
-      ...(workspaceContext?.spaceKey
-        ? { spaceKey: workspaceContext.spaceKey }
-        : {}),
-      ...(workspaceContext?.repositorySlug
-        ? { repositorySlug: workspaceContext.repositorySlug }
-        : {}),
-      ...(workspaceContext?.serviceId
-        ? { incidentKey: workspaceContext.serviceId }
-        : {}),
-    },
+    scope: resolveEffectiveScope(config, workspaceContext, hostContext),
     sources: [...config.selectedSources],
     depth: config.depth,
     includeTeamworkGraph: config.selectedSources.includes('teamwork-graph'),

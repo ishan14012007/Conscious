@@ -13,6 +13,19 @@ export type IntelligenceSourceId =
 
 export type AnalysisDepth = 'quick' | 'balanced' | 'deep';
 
+export type DriftScopeKind =
+  | 'projectKey'
+  | 'issueKey'
+  | 'spaceKey'
+  | 'pageId'
+  | 'repositorySlug'
+  | 'incidentKey';
+
+export interface CeraScopeInput {
+  kind: DriftScopeKind;
+  value: string;
+}
+
 export interface AgentControlsState {
   mode: AgentMode;
   finish: AgentFinish;
@@ -24,4 +37,5 @@ export interface AgentControlsState {
 export interface CeraAnalysisConfig {
   selectedSources: IntelligenceSourceId[];
   depth: AnalysisDepth;
+  scopeInput: CeraScopeInput;
 }

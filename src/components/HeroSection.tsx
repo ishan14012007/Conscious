@@ -6,6 +6,7 @@ import {
   AgentMotionMode,
   AnalysisDepth,
   CeraAnalysisConfig,
+  CeraScopeInput,
   IntelligenceSourceId,
 } from '../types/agent';
 import type {
@@ -21,6 +22,7 @@ import { AgentStage3D } from './AgentStage3D';
 import { CeraControlCentre } from './CeraControlCentre';
 
 interface HeroSectionProps {
+  controlsOpen: boolean;
   controlsState: AgentControlsState;
   analysisConfig: CeraAnalysisConfig;
   session: ConsciousSessionState;
@@ -30,21 +32,25 @@ interface HeroSectionProps {
   evidenceOperation: CeraOperationState<DriftEvidenceResult>;
   pendingDraftOperation: CeraOperationState<ConfluenceDocDraft>;
   applyUpdateOperation: CeraOperationState<ConfluenceUpdateResult>;
+  onToggleControls: () => void;
+  onCloseControls: () => void;
   onSelectMode: (mode: AgentMode) => void;
   onToggleSource: (sourceId: IntelligenceSourceId) => void;
   onChangeDepth: (depth: AnalysisDepth) => void;
+  onChangeScopeInput: (scopeInput: CeraScopeInput) => void;
   onToggleCursorAwareness: () => void;
   onChangeMotion: (motion: AgentMotionMode) => void;
+  onRunDocumentationCheck: () => void;
   onRunDriftCheck: () => void;
   onReviewPendingChanges: () => void;
   onLoadRecentFindings: () => void;
   onApprovePendingDraft: (draft: ConfluenceDocDraft) => void;
   onAgentWake: () => void;
   onResetCera: () => void;
-  onOpenAccessModal: () => void;
 }
 
 export function HeroSection({
+  controlsOpen,
   controlsState,
   analysisConfig,
   session,
@@ -54,20 +60,22 @@ export function HeroSection({
   evidenceOperation,
   pendingDraftOperation,
   applyUpdateOperation,
+  onToggleControls,
+  onCloseControls,
   onSelectMode,
   onToggleSource,
   onChangeDepth,
+  onChangeScopeInput,
   onToggleCursorAwareness,
   onChangeMotion,
+  onRunDocumentationCheck,
   onRunDriftCheck,
   onReviewPendingChanges,
   onLoadRecentFindings,
   onApprovePendingDraft,
   onAgentWake,
   onResetCera,
-  onOpenAccessModal,
 }: HeroSectionProps) {
-  const [controlsOpen, setControlsOpen] = useState(false);
   const [interactionCount, setInteractionCount] = useState(0);
 
   return (
@@ -89,7 +97,7 @@ export function HeroSection({
           controlsState={controlsState}
           controlsOpen={controlsOpen}
           resetCameraSignal={resetCameraSignal}
-          onToggleControls={() => setControlsOpen((prev) => !prev)}
+          onToggleControls={onToggleControls}
           onAgentInteract={() => {
             setInteractionCount((c) => c + 1);
             onAgentWake();
@@ -114,10 +122,10 @@ export function HeroSection({
               <div className="pointer-events-auto mt-6 flex flex-wrap items-center gap-4">
                 <button
                   type="button"
-                  onClick={onOpenAccessModal}
+                  onClick={onRunDocumentationCheck}
                   className="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#1D4ED8] transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
                 >
-                  Get Started
+                  Run Documentation Check
                 </button>
               </div>
 
@@ -135,7 +143,7 @@ export function HeroSection({
           </div>
         </div>
 
-        {/* Cera Control Centre opened via chest core button */}
+        {/* Cera Control Centre opened via chest core button or Run Documentation Check */}
         <AnimatePresence>
           {controlsOpen && (
             <CeraControlCentre
@@ -150,6 +158,7 @@ export function HeroSection({
               onSelectMode={onSelectMode}
               onToggleSource={onToggleSource}
               onChangeDepth={onChangeDepth}
+              onChangeScopeInput={onChangeScopeInput}
               onToggleCursorAwareness={onToggleCursorAwareness}
               onChangeMotion={onChangeMotion}
               onRunDriftCheck={onRunDriftCheck}
@@ -157,7 +166,7 @@ export function HeroSection({
               onLoadRecentFindings={onLoadRecentFindings}
               onApprovePendingDraft={onApprovePendingDraft}
               onReset={onResetCera}
-              onClose={() => setControlsOpen(false)}
+              onClose={onCloseControls}
             />
           )}
         </AnimatePresence>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AccessModal } from './components/AccessModal';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
+import { WorkspaceConnectionsModal } from './components/WorkspaceConnectionsModal';
 import {
   approveAndApplyConfluenceUpdate,
   fetchDriftEvidence,
@@ -16,6 +16,7 @@ import {
   AgentMotionMode,
   AnalysisDepth,
   CeraAnalysisConfig,
+  CeraScopeInput,
   IntelligenceSourceId,
 } from './types/agent';
 import type {
@@ -26,26 +27,33 @@ import type {
   ConsciousSessionState,
   DriftAnalysisResult,
   DriftEvidenceResult,
+  ForgeHostContext,
+  WorkspaceContext,
 } from './types/forge';
 import {
   buildDriftAnalysisRequest,
   createDefaultAnalysisConfig,
   createDefaultControlsState,
+  createDefaultScopeInput,
   createIdleOperationState,
   formatUnavailableOperationMessage,
+  hasMeaningfulScope,
+  resolveEffectiveScope,
   resolveNextAgentMode,
   toggleIntelligenceSource,
 } from './utils/ceraControlLogic';
 
 export default function App() {
+  const [controlsOpen, setControlsOpen] = useState(false);
   const [controlsState, setControlsState] = useState<AgentControlsState>(
     createDefaultControlsState,
   );
   const [analysisConfig, setAnalysisConfig] = useState<CeraAnalysisConfig>(
-    createDefaultAnalysisConfig,
+    () => createDefaultAnalysisConfig(),
   );
   const [resetCameraSignal, setResetCameraSignal] = useState(0);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [connectionsModalOpen, setConnectionsModalOpen] = useState(false);
+  const [refreshingConnections, setRefreshingConnections] = useState(false);
 
   const [consciousSession, setConsciousSession] =
     useState<ConsciousSessionState>({
@@ -71,6 +79,64 @@ export default function App() {
     CeraOperationState<ConfluenceUpdateResult>
   >(createIdleOperationState);
 
+  const syncDefaultScopeFromContext = useCallback(
+    (hostContext: ForgeHostContext | null, workspaceContext: WorkspaceContext | null) => {
+      const derived = createDefaultScopeInput(hostContext, workspaceContext);
+      if (!derived.value) {
+        return;
+      }
+      setAnalysisConfig((prev) =>
+        prev.scopeInput.value.trim() ? prev : { ...prev, scopeInput: derived },
+      );
+    },
+    [],
+  );
+
+  const loadWorkspaceStatus = useCallback(async () => {
+    setRefreshingConnections(true);
+    try {
+      const hostContext = await getHostContext();
+
+      if (hostContext.mode === 'standalone') {
+        setConsciousSession({
+          runtimeMode: 'standalone',
+          workflowStage: 'standalone',
+          hostContext,
+          workspaceContext: null,
+          lastError: null,
+        });
+        syncDefaultScopeFromContext(hostContext, null);
+        return;
+      }
+
+      const workspaceResult = await fetchWorkspaceContext();
+
+      if (workspaceResult.ok) {
+        setConsciousSession({
+          runtimeMode: 'forge',
+          workflowStage: 'ready',
+          hostContext,
+          workspaceContext: workspaceResult.data,
+          lastError: null,
+        });
+        syncDefaultScopeFromContext(hostContext, workspaceResult.data);
+        return;
+      }
+
+      setConsciousSession({
+        runtimeMode: 'forge',
+        workflowStage:
+          workspaceResult.status === 'not_implemented' ? 'backend_pending' : 'error',
+        hostContext,
+        workspaceContext: null,
+        lastError: workspaceResult.error,
+      });
+      syncDefaultScopeFromContext(hostContext, null);
+    } finally {
+      setRefreshingConnections(false);
+    }
+  }, [syncDefaultScopeFromContext]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -88,6 +154,7 @@ export default function App() {
           workspaceContext: null,
           lastError: null,
         });
+        syncDefaultScopeFromContext(hostContext, null);
         return;
       }
 
@@ -104,6 +171,7 @@ export default function App() {
           workspaceContext: workspaceResult.data,
           lastError: null,
         });
+        syncDefaultScopeFromContext(hostContext, workspaceResult.data);
         return;
       }
 
@@ -115,6 +183,7 @@ export default function App() {
         workspaceContext: null,
         lastError: workspaceResult.error,
       });
+      syncDefaultScopeFromContext(hostContext, null);
     }
 
     void initializeForgeContext();
@@ -122,7 +191,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [syncDefaultScopeFromContext]);
 
   const handleRunDriftCheck = useCallback(async () => {
     setActiveQuickAction('drift');
@@ -134,15 +203,38 @@ export default function App() {
         error: {
           code: 'VALIDATION_ERROR',
           message:
-            'Select at least one intelligence source before running a drift check.',
+            'Select at least one intelligence source before running a documentation check.',
         },
         statusMessage:
-          'Select at least one intelligence source before running a drift check.',
+          'Select at least one intelligence source before running a documentation check.',
         updatedAt: new Date().toISOString(),
       });
       return;
     }
 
+    const effectiveScope = resolveEffectiveScope(
+      analysisConfig,
+      consciousSession.workspaceContext,
+      consciousSession.hostContext,
+    );
+
+    if (!hasMeaningfulScope(effectiveScope)) {
+      setAnalysisOperation({
+        status: 'error',
+        data: null,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message:
+            'Enter a meaningful analysis scope (Jira project/issue, Confluence space/page, Bitbucket repo, or JSM incident) or open Conscious within an active Jira context.',
+        },
+        statusMessage:
+          'A meaningful analysis scope is required before running a check. Enter a Jira project/issue, Confluence space/page, Bitbucket repo, or JSM incident in Analysis Scope above.',
+        updatedAt: new Date().toISOString(),
+      });
+      return;
+    }
+
+    setControlsState((prev) => ({ ...prev, mode: 'analyzing' }));
     setAnalysisOperation((prev) => ({
       ...prev,
       status: 'loading',
@@ -153,6 +245,7 @@ export default function App() {
     const request = buildDriftAnalysisRequest(
       analysisConfig,
       consciousSession.workspaceContext,
+      consciousSession.hostContext,
     );
     const result = await runDriftAnalysis(request);
 
@@ -168,7 +261,7 @@ export default function App() {
     }
 
     const message = formatUnavailableOperationMessage(
-      'Drift check',
+      'Documentation drift check',
       result.status,
       result.error,
       consciousSession,
@@ -185,6 +278,21 @@ export default function App() {
       updatedAt: new Date().toISOString(),
     });
   }, [analysisConfig, consciousSession]);
+
+  const handleRunDocumentationCheck = useCallback(() => {
+    setControlsOpen(true);
+    setControlsState((prev) =>
+      prev.mode === 'sleep' ? { ...prev, mode: 'standby' } : prev,
+    );
+    void handleRunDriftCheck();
+  }, [handleRunDriftCheck]);
+
+  const handleOpenWorkspaceConnections = useCallback(() => {
+    setConnectionsModalOpen(true);
+    if (consciousSession.runtimeMode === 'forge' && !consciousSession.workspaceContext) {
+      void loadWorkspaceStatus();
+    }
+  }, [consciousSession.runtimeMode, consciousSession.workspaceContext, loadWorkspaceStatus]);
 
   const handleReviewPendingChanges = useCallback(async () => {
     setActiveQuickAction('pending');
@@ -241,7 +349,6 @@ export default function App() {
       return;
     }
 
-    // Verify backend workspace readiness before reporting status
     setPendingDraftOperation((prev) => ({
       ...prev,
       status: 'loading',
@@ -440,6 +547,10 @@ export default function App() {
     setAnalysisConfig((prev) => ({ ...prev, depth }));
   }, []);
 
+  const handleChangeScopeInput = useCallback((scopeInput: CeraScopeInput) => {
+    setAnalysisConfig((prev) => ({ ...prev, scopeInput }));
+  }, []);
+
   const handleToggleCursorAwareness = useCallback(() => {
     setControlsState((prev) => ({ ...prev, trackCursor: !prev.trackCursor }));
   }, []);
@@ -450,21 +561,27 @@ export default function App() {
 
   const handleResetCera = useCallback(() => {
     setControlsState(createDefaultControlsState());
-    setAnalysisConfig(createDefaultAnalysisConfig());
+    setAnalysisConfig(
+      createDefaultAnalysisConfig(
+        consciousSession.hostContext,
+        consciousSession.workspaceContext,
+      ),
+    );
     setActiveQuickAction(null);
     setAnalysisOperation(createIdleOperationState());
     setEvidenceOperation(createIdleOperationState());
     setPendingDraftOperation(createIdleOperationState());
     setApplyUpdateOperation(createIdleOperationState());
     setResetCameraSignal((n) => n + 1);
-  }, []);
+  }, [consciousSession.hostContext, consciousSession.workspaceContext]);
 
   return (
     <div className="min-h-screen bg-[#04070E] text-[#E6EEF8]">
-      <Header onOpenAccessModal={() => setModalOpen(true)} />
+      <Header onOpenWorkspaceConnections={handleOpenWorkspaceConnections} />
 
       <main>
         <HeroSection
+          controlsOpen={controlsOpen}
           controlsState={controlsState}
           analysisConfig={analysisConfig}
           session={consciousSession}
@@ -474,11 +591,15 @@ export default function App() {
           evidenceOperation={evidenceOperation}
           pendingDraftOperation={pendingDraftOperation}
           applyUpdateOperation={applyUpdateOperation}
+          onToggleControls={() => setControlsOpen((prev) => !prev)}
+          onCloseControls={() => setControlsOpen(false)}
           onSelectMode={handleSelectMode}
           onToggleSource={handleToggleSource}
           onChangeDepth={handleChangeDepth}
+          onChangeScopeInput={handleChangeScopeInput}
           onToggleCursorAwareness={handleToggleCursorAwareness}
           onChangeMotion={handleChangeMotion}
+          onRunDocumentationCheck={handleRunDocumentationCheck}
           onRunDriftCheck={() => {
             void handleRunDriftCheck();
           }}
@@ -493,14 +614,17 @@ export default function App() {
           }}
           onAgentWake={handleAgentWake}
           onResetCera={handleResetCera}
-          onOpenAccessModal={() => setModalOpen(true)}
         />
       </main>
 
-      <AccessModal
-        open={modalOpen}
-        initialTier="Production"
-        onClose={() => setModalOpen(false)}
+      <WorkspaceConnectionsModal
+        open={connectionsModalOpen}
+        session={consciousSession}
+        refreshing={refreshingConnections}
+        onRefresh={() => {
+          void loadWorkspaceStatus();
+        }}
+        onClose={() => setConnectionsModalOpen(false)}
       />
     </div>
   );

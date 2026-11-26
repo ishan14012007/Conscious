@@ -17,6 +17,8 @@ import {
   AgentMotionMode,
   AnalysisDepth,
   CeraAnalysisConfig,
+  CeraScopeInput,
+  DriftScopeKind,
   IntelligenceSourceId,
 } from '../types/agent';
 import type {
@@ -31,8 +33,11 @@ import type {
 } from '../types/forge';
 import {
   ANALYSIS_DEPTH_OPTIONS,
+  DRIFT_SCOPE_OPTIONS,
   INTELLIGENCE_SOURCES,
   getSourceConnectionStatus,
+  hasMeaningfulScope,
+  resolveEffectiveScope,
 } from '../utils/ceraControlLogic';
 
 interface CeraControlCentreProps {
@@ -47,6 +52,7 @@ interface CeraControlCentreProps {
   onSelectMode: (mode: AgentMode) => void;
   onToggleSource: (sourceId: IntelligenceSourceId) => void;
   onChangeDepth: (depth: AnalysisDepth) => void;
+  onChangeScopeInput: (scopeInput: CeraScopeInput) => void;
   onToggleCursorAwareness: () => void;
   onChangeMotion: (motion: AgentMotionMode) => void;
   onRunDriftCheck: () => void;
@@ -137,6 +143,7 @@ export function CeraControlCentre({
   onSelectMode,
   onToggleSource,
   onChangeDepth,
+  onChangeScopeInput,
   onToggleCursorAwareness,
   onChangeMotion,
   onRunDriftCheck,
@@ -152,6 +159,20 @@ export function CeraControlCentre({
     (source) =>
       getSourceConnectionStatus(source.id, session.workspaceContext) === 'connected',
   ).length;
+  const effectiveScope = resolveEffectiveScope(
+    analysisConfig,
+    session.workspaceContext,
+    session.hostContext,
+  );
+  const scopeReady = hasMeaningfulScope(effectiveScope);
+  const activeJiraBadge =
+    session.hostContext?.issueKey ??
+    session.workspaceContext?.projectKey ??
+    session.hostContext?.projectKey ??
+    null;
+  const selectedScopeOption =
+    DRIFT_SCOPE_OPTIONS.find((opt) => opt.id === analysisConfig.scopeInput.kind) ??
+    DRIFT_SCOPE_OPTIONS[0];
 
   const modeSummary = (() => {
     switch (controlsState.mode) {
@@ -343,6 +364,65 @@ export function CeraControlCentre({
         <span className="block text-[11px] font-medium text-sky-400/90">
           Analysis Configuration
         </span>
+
+        {/* Analysis Scope */}
+        <div>
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <label
+              htmlFor="cera-scope-value"
+              className="text-xs text-slate-300"
+            >
+              Analysis Scope
+            </label>
+            <span
+              className={`text-[11px] truncate ${
+                activeJiraBadge
+                  ? 'text-sky-300'
+                  : scopeReady
+                    ? 'text-slate-400'
+                    : 'text-amber-300/90'
+              }`}
+            >
+              {activeJiraBadge
+                ? `Active Jira: ${activeJiraBadge}`
+                : scopeReady
+                  ? 'Scope configured'
+                  : 'Scope required'}
+            </span>
+          </div>
+          <div className="grid grid-cols-[126px_1fr] gap-2">
+            <select
+              aria-label="Analysis scope type"
+              value={analysisConfig.scopeInput.kind}
+              onChange={(event) =>
+                onChangeScopeInput({
+                  ...analysisConfig.scopeInput,
+                  kind: event.target.value as DriftScopeKind,
+                })
+              }
+              className="min-h-[36px] md:min-h-[32px] rounded-lg border border-white/10 bg-[#0A1120] px-2 py-1 text-xs text-slate-200 focus:border-sky-400 focus:outline-none"
+            >
+              {DRIFT_SCOPE_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <input
+              id="cera-scope-value"
+              type="text"
+              value={analysisConfig.scopeInput.value}
+              onChange={(event) =>
+                onChangeScopeInput({
+                  ...analysisConfig.scopeInput,
+                  value: event.target.value,
+                })
+              }
+              placeholder={selectedScopeOption.placeholder}
+              className="min-h-[36px] md:min-h-[32px] rounded-lg border border-white/10 bg-[#04070E] px-2.5 py-1 text-xs text-white placeholder:text-slate-500 focus:border-sky-400 focus:outline-none"
+            />
+          </div>
+        </div>
 
         {/* Analysis Depth */}
         <div>
@@ -577,6 +657,17 @@ function DriftOperationView({
                 <p className="mt-0.5 text-[11px] text-slate-400">
                   {finding.summary}
                 </p>
+                {(finding.affectedPageId || finding.sourceRefs.length > 0) && (
+                  <p className="mt-0.5 text-[10px] font-mono text-slate-500">
+                    {finding.affectedPageId
+                      ? `Page ${finding.affectedPageId}`
+                      : ''}
+                    {finding.affectedPageId && finding.sourceRefs.length > 0
+                      ? ' · '
+                      : ''}
+                    {finding.sourceRefs.join(', ')}
+                  </p>
+                )}
               </li>
             ))}
           </ul>

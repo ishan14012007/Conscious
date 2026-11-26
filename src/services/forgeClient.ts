@@ -100,6 +100,22 @@ function detectHostProduct(context: FullContext): ForgeHostProduct {
   return 'unknown';
 }
 
+function extractNestedString(
+  root: unknown,
+  nestedKey: string,
+  leafKey: string,
+): string | undefined {
+  if (!isRecord(root)) {
+    return undefined;
+  }
+  const nested = root[nestedKey];
+  if (!isRecord(nested)) {
+    return undefined;
+  }
+  const leaf = nested[leafKey];
+  return typeof leaf === 'string' && leaf.trim() ? leaf.trim() : undefined;
+}
+
 function mapFullContext(context: FullContext): ForgeHostContext {
   return {
     mode: 'forge',
@@ -113,6 +129,10 @@ function mapFullContext(context: FullContext): ForgeHostContext {
     locale: context.locale,
     timezone: context.timezone,
     extensionType: extractExtensionType(context),
+    projectKey: extractNestedString(context.extension, 'project', 'key'),
+    issueKey: extractNestedString(context.extension, 'issue', 'key'),
+    spaceKey: extractNestedString(context.extension, 'space', 'key'),
+    pageId: extractNestedString(context.extension, 'content', 'id'),
   };
 }
 

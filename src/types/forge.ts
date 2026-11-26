@@ -21,6 +21,10 @@ export interface ForgeHostContext {
   locale?: string;
   timezone?: string;
   extensionType?: string;
+  projectKey?: string;
+  issueKey?: string;
+  spaceKey?: string;
+  pageId?: string;
 }
 
 export type ForgeErrorCode =
