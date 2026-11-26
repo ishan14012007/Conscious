@@ -1,0 +1,6 @@
+{
+  "name": "Aetheris",
+  "description": "Interactive 3D AI agent website template with a dark cobalt theme and cursor-tracking 3D optical agent.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
