@@ -55,10 +55,10 @@ const MODE_CONFIGS: Record<
   },
   focused: {
     emissiveHex: 0x60a5fa,
-    emissiveIntensity: 3.4,
+    emissiveIntensity: 3.0,
     lidOpen: 1.0,
     pupilScale: 1.25,
-    haloSpeed: 0.75,
+    haloSpeed: 0.25,
   },
   sleep: {
     emissiveHex: 0x1e3a8a,
@@ -737,6 +737,8 @@ export function AgentStage3D({
 
       // Compute 3D world gaze target from cursor NDC
       const isAwake = current.mode !== 'sleep';
+      const isFocused = current.mode === 'focused';
+      const isReducedMotion = prefersReducedMotion || current.motion === 'reduced';
       let targetHeadYaw = 0;
       let targetHeadPitch = 0;
       let targetTorsoYaw = 0;
@@ -752,15 +754,18 @@ export function AgentStage3D({
         targetHeadYaw = THREE.MathUtils.clamp(pointerX * 0.34, -0.34, 0.34);
         targetHeadPitch = THREE.MathUtils.clamp(-pointerY * 0.22, -0.2, 0.2);
         targetTorsoYaw = THREE.MathUtils.clamp(pointerX * 0.11, -0.11, 0.11);
-      } else if (isAwake && !prefersReducedMotion) {
+      } else if (isAwake && !isReducedMotion && !isFocused) {
         // Gentle idle scan when cursor tracking is paused or before first move
         const scanX = Math.sin(elapsed * 0.55) * 0.55;
         const scanY = Math.cos(elapsed * 0.38) * 0.22;
         _gazeWorld.set(scanX, 1.76 + scanY, 3.0);
         targetHeadYaw = scanX * 0.14;
         targetHeadPitch = -scanY * 0.12;
+      } else if (isAwake) {
+        // Steady centered gaze in Focus or Reduced motion
+        _gazeWorld.set(0, 1.76, 3.0);
       } else {
-        // Sleep posture: head bowed slightly
+        // Sleep posture: head bowed slightly, gaze paused
         _gazeWorld.set(0, 1.3, 3.0);
         targetHeadPitch = 0.22;
       }
@@ -770,7 +775,13 @@ export function AgentStage3D({
       flareImpulse = THREE.MathUtils.damp(flareImpulse, 0, 6, delta);
 
       // Smooth damped torso, head & zero-gravity levitation buoyancy
-      const motionScale = prefersReducedMotion ? 0.15 : 1.0;
+      const motionScale = !isAwake
+        ? 0
+        : isReducedMotion
+          ? 0.08
+          : isFocused
+            ? 0.28
+            : 1.0;
       const hoverWave = Math.sin(elapsed * 1.45) * 0.095 * motionScale;
       const baseHoverY = isAwake ? 0.68 : 0.48;
       agent.hoverGroup.position.y = THREE.MathUtils.damp(
@@ -795,13 +806,38 @@ export function AgentStage3D({
         isAwake ? THREE.MathUtils.clamp(0.28 - normalizedRise * 0.08, 0.1, 0.3) : 0.08;
 
       // Counter-oscillating lower magnetic repulsor rings under floating chassis
-      if (!prefersReducedMotion) {
+      if (isAwake && !isReducedMotion && !isFocused) {
         agent.lowerRingOuter.rotation.x =
           Math.PI / 2 + Math.sin(elapsed * 1.6) * 0.09;
         agent.lowerRingOuter.rotation.y = Math.cos(elapsed * 1.2) * 0.09;
         agent.lowerRingInner.rotation.x =
           Math.PI / 2 - Math.cos(elapsed * 2.1) * 0.12;
         agent.lowerRingInner.rotation.y = -Math.sin(elapsed * 1.5) * 0.12;
+      } else {
+        agent.lowerRingOuter.rotation.x = THREE.MathUtils.damp(
+          agent.lowerRingOuter.rotation.x,
+          Math.PI / 2,
+          6,
+          delta,
+        );
+        agent.lowerRingOuter.rotation.y = THREE.MathUtils.damp(
+          agent.lowerRingOuter.rotation.y,
+          0,
+          6,
+          delta,
+        );
+        agent.lowerRingInner.rotation.x = THREE.MathUtils.damp(
+          agent.lowerRingInner.rotation.x,
+          Math.PI / 2,
+          6,
+          delta,
+        );
+        agent.lowerRingInner.rotation.y = THREE.MathUtils.damp(
+          agent.lowerRingInner.rotation.y,
+          0,
+          6,
+          delta,
+        );
       }
 
       torsoYaw = THREE.MathUtils.damp(torsoYaw, targetTorsoYaw, 4.2, delta);
@@ -827,7 +863,7 @@ export function AgentStage3D({
         ? computeEyeAngles(agent.rightEye.pivot)
         : { yaw: 0, pitch: 0.15 };
 
-      const eyeLambda = prefersReducedMotion ? 5 : 16;
+      const eyeLambda = isReducedMotion ? 5 : 16;
       eyeYawL = THREE.MathUtils.damp(eyeYawL, leftTarget.yaw, eyeLambda, delta);
       eyePitchL = THREE.MathUtils.damp(
         eyePitchL,
@@ -847,7 +883,7 @@ export function AgentStage3D({
       agent.rightEye.pivot.rotation.set(eyePitchR, eyeYawR, 0);
 
       // Natural periodic blink & mode-specific eyelid aperture
-      if (isAwake && !prefersReducedMotion) {
+      if (isAwake && !isReducedMotion) {
         if (elapsed > nextBlinkTime && blinkTimer < 0) {
           blinkTimer = 0;
           nextBlinkTime = elapsed + 3.4 + Math.random() * 2.8;
@@ -891,9 +927,10 @@ export function AgentStage3D({
       agent.leftEye.pupilMesh.scale.setScalar(currentPupilScale);
       agent.rightEye.pupilMesh.scale.setScalar(currentPupilScale);
 
-      const pulse = prefersReducedMotion
-        ? 0
-        : Math.sin(elapsed * (current.mode === 'analyzing' ? 5.2 : 2.1)) * 0.28;
+      const pulse =
+        isReducedMotion || !isAwake || isFocused
+          ? 0
+          : Math.sin(elapsed * (current.mode === 'analyzing' ? 5.2 : 2.1)) * 0.28;
       currentEmissive = THREE.MathUtils.damp(
         currentEmissive,
         modeCfg.emissiveIntensity + pulse + flareImpulse,
@@ -930,15 +967,16 @@ export function AgentStage3D({
       }
 
       // Orbital neural rings & clean spatial background drift
-      if (!prefersReducedMotion) {
+      if (isAwake && !isReducedMotion) {
+        const bgSpeed = isFocused ? 0.18 : 1.0;
         agent.outerHalo.rotation.y += delta * modeCfg.haloSpeed;
         agent.innerHalo.rotation.y -= delta * modeCfg.haloSpeed * 1.45;
-        particles.rotation.y = elapsed * 0.03;
-        deepStars.rotation.y = elapsed * 0.006;
-        spaceArcs[0].rotation.z += delta * 0.045;
-        spaceArcs[1].rotation.z -= delta * 0.032;
-        spaceArcs[2].rotation.z += delta * 0.024;
-        spaceShards.rotation.y = -elapsed * 0.022;
+        particles.rotation.y += delta * 0.03 * bgSpeed;
+        deepStars.rotation.y += delta * 0.006 * bgSpeed;
+        spaceArcs[0].rotation.z += delta * 0.045 * bgSpeed;
+        spaceArcs[1].rotation.z -= delta * 0.032 * bgSpeed;
+        spaceArcs[2].rotation.z += delta * 0.024 * bgSpeed;
+        spaceShards.rotation.y -= delta * 0.022 * bgSpeed;
       }
 
       if (disposed || contextLost) return;

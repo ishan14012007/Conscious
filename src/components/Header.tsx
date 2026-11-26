@@ -9,6 +9,7 @@ export function Header({ onOpenAccessModal }: HeaderProps) {
         {/* Brand Wordmark */}
         <a
           href="#"
+          onClick={(event) => event.preventDefault()}
           className="font-display text-xl font-bold tracking-tight text-white whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-400"
         >
           Conscious
