@@ -55,7 +55,7 @@ export function AccessModal({ open, initialTier, onClose }: AccessModalProps) {
               id="access-modal-title"
               className="font-display text-xl font-semibold text-white"
             >
-              Deploy Consy on Conscious
+              Deploy Cera on Conscious
             </h2>
             <p className="mt-1 text-xs text-slate-400">
               Configure your deployment tier and receive sandbox credentials.

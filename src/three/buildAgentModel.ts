@@ -220,7 +220,7 @@ export function buildAgentModel(
     }),
   );
 
-  // 1. Detached Volumetric Shadow & Faint Repulsor Projection in Air Beneath Consy
+  // 1. Detached Volumetric Shadow & Faint Repulsor Projection in Air Beneath Cera
   // (Zero solid floor or pedestal so the bot visibly levitates in open space)
   const contactTex = track(createContactShadowTexture());
   const contactGeo = track(new THREE.PlaneGeometry(3.4, 3.4));

@@ -218,7 +218,7 @@ export function AgentStage3D({
     const particleSprite = createParticleSprite();
     const spaceDisposables: Array<{ dispose: () => void }> = [];
 
-    // 1. Subtle soft cobalt depth glow behind Consy (keeps exact #04070E theme)
+    // 1. Subtle soft cobalt depth glow behind Cera (keeps exact #04070E theme)
     const nebulaSpecs = [
       { pos: [-3.8, 2.1, -11] as const, scale: 11, color: 0x1d4ed8, opacity: 0.16 },
       { pos: [4.2, 0.2, -12] as const, scale: 12, color: 0x2563eb, opacity: 0.14 },
@@ -290,7 +290,7 @@ export function AgentStage3D({
     scene.add(deepStars);
     spaceDisposables.push(deepStarGeo, deepStarMat);
 
-    // 3. Minimalist broken orbital telemetry arcs sweeping around Consy in open space
+    // 3. Minimalist broken orbital telemetry arcs sweeping around Cera in open space
     const spaceOrbitGroup = new THREE.Group();
     spaceOrbitGroup.position.set(0, 1.04, 0);
     scene.add(spaceOrbitGroup);
@@ -337,7 +337,7 @@ export function AgentStage3D({
       spaceDisposables.push(geo, mat);
     }
 
-    // 4. Floating minimalist blue octahedral micro-shards suspended around Consy
+    // 4. Floating minimalist blue octahedral micro-shards suspended around Cera
     const shardCount = 26;
     const shardGeo = new THREE.OctahedronGeometry(0.055, 0);
     const shardMat = new THREE.MeshStandardMaterial({
@@ -394,7 +394,7 @@ export function AgentStage3D({
     const particles = new THREE.Points(particleGeo, particleMat);
     scene.add(particles);
 
-    // Build centered minimalist levitating 3D AI Agent (Consy)
+    // Build centered minimalist levitating 3D AI Agent (Cera)
     const maxAniso = renderer.capabilities.getMaxAnisotropy();
     const agent = buildAgentModel(isSoftwareGl, maxAniso);
     agent.root.scale.setScalar(0.72);
@@ -728,7 +728,7 @@ export function AgentStage3D({
       }
       orbit.update();
 
-      // Update gaze plane facing the camera ~3.0 units in front of Consy
+      // Update gaze plane facing the camera ~3.0 units in front of Cera
       camera.getWorldDirection(_camDir);
       _gazePlane.setFromNormalAndCoplanarPoint(
         _camDir.negate(),
@@ -784,7 +784,7 @@ export function AgentStage3D({
       agent.hoverGroup.rotation.x =
         Math.cos(elapsed * 1.1) * 0.016 * motionScale;
 
-      // Inverse detached shadow & repulsor projection scale/opacity as Consy rises
+      // Inverse detached shadow & repulsor projection scale/opacity as Cera rises
       const normalizedRise = (agent.hoverGroup.position.y - 0.48) / 0.3;
       const shadowScale = THREE.MathUtils.clamp(1.06 - normalizedRise * 0.22, 0.72, 1.1);
       agent.contactShadow.scale.setScalar(shadowScale);
@@ -995,7 +995,7 @@ export function AgentStage3D({
       <div
         ref={mountRef}
         className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing touch-pan-y"
-        aria-label="Interactive 3D AI agent Consy whose eyes follow your cursor"
+        aria-label="Interactive 3D AI agent Cera whose eyes follow your cursor"
       />
       {!webglUnavailable && (
         <div
@@ -1006,7 +1006,7 @@ export function AgentStage3D({
           <button
             type="button"
             onClick={() => toggleCallbackRef.current()}
-            aria-label="Click stomach button for Consy controls"
+            aria-label="Click stomach button for Cera controls"
             tabIndex={controlsOpen ? -1 : 0}
             className={`flex flex-col items-center gap-1 text-[10px] font-medium tracking-wide text-sky-200/85 hover:text-white transition-opacity duration-200 whitespace-nowrap select-none drop-shadow-[0_1px_6px_rgba(4,7,14,0.98)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 ${
               controlsOpen

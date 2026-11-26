@@ -50,7 +50,7 @@ export function HeroSection({
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_46%,rgba(37,99,235,0.14),rgba(4,7,14,0)_58%)]"
         />
 
-        {/* Centered Minimalist Levitating 3D AI Agent Stage (Consy) */}
+        {/* Centered Minimalist Levitating 3D AI Agent Stage (Cera) */}
         <AgentStage3D
           controlsState={controlsState}
           controlsOpen={controlsOpen}
@@ -59,19 +59,19 @@ export function HeroSection({
           onAgentInteract={() => setInteractionCount((c) => c + 1)}
         />
 
-        {/* Clean Left Hero Framing (center 3D Consy remains completely unobstructed) */}
+        {/* Clean Left Hero Framing (center 3D Cera remains completely unobstructed) */}
         <div className="pointer-events-none absolute inset-0 z-10 mx-auto max-w-[1440px] px-6 lg:px-10">
           <div className="flex h-full flex-col justify-between pt-7 pb-10 lg:justify-center lg:py-12">
             <div className="max-w-xs sm:max-w-sm lg:max-w-[340px]">
               <p className="text-xs font-medium tracking-wide text-sky-400/90">
-                Meet Consy
+                Meet Cera
               </p>
               <h1 className="mt-3 font-display text-[clamp(2rem,3.2vw,3rem)] font-semibold leading-[1.08] tracking-tight text-white text-balance">
-                Conscious AI, built around Consy.
+                Conscious AI, built around Cera.
               </h1>
               <p className="mt-4 text-sm sm:text-[15px] leading-relaxed tracking-wide text-slate-300/90">
-                Move your cursor across the screen to guide Consy&apos;s gaze.
-                Click the glowing core on Consy&apos;s chest to open controls.
+                Move your cursor across the screen to guide Cera&apos;s gaze.
+                Click the glowing core on Cera&apos;s chest to open controls.
               </p>
 
               <div className="pointer-events-auto mt-6 flex flex-wrap items-center gap-4">
@@ -102,8 +102,8 @@ export function HeroSection({
         <AnimatePresence>
           {controlsOpen && (
             <motion.aside
-              key="consy-alternating-controls"
-              aria-label="Consy controls"
+              key="cera-alternating-controls"
+              aria-label="Cera controls"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -123,7 +123,7 @@ export function HeroSection({
                 </span>
                 <div
                   role="group"
-                  aria-label="Consy mode"
+                  aria-label="Cera mode"
                   className="flex flex-wrap justify-end items-center gap-3 lg:gap-4"
                 >
                   {MODES.map((m) => {
@@ -142,7 +142,7 @@ export function HeroSection({
                         {m.label}
                         {active && (
                           <motion.span
-                            layoutId="consy-mode-indicator"
+                            layoutId="cera-mode-indicator"
                             transition={{
                               type: 'spring',
                               stiffness: 450,
@@ -170,7 +170,7 @@ export function HeroSection({
                 </span>
                 <div
                   role="group"
-                  aria-label="Consy chassis finish"
+                  aria-label="Cera chassis finish"
                   className="flex items-center gap-3"
                 >
                   {FINISHES.map((f) => {
@@ -305,8 +305,8 @@ export function HeroSection({
         <AnimatePresence>
           {controlsOpen && (
             <motion.aside
-              key="consy-mobile-controls"
-              aria-label="Consy mobile controls"
+              key="cera-mobile-controls"
+              aria-label="Cera mobile controls"
               initial={{ opacity: 0, x: 24 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
@@ -316,7 +316,7 @@ export function HeroSection({
               {/* Option 1 (Right-aligned): Mode */}
               <div
                 role="group"
-                aria-label="Consy mode"
+                aria-label="Cera mode"
                 className="pointer-events-auto self-end flex flex-wrap justify-end items-center gap-3"
               >
                 {MODES.map((m) => {
@@ -368,7 +368,7 @@ export function HeroSection({
                   {Math.round(controlsState.explode * 100)}%
                 </span>
                 <input
-                  aria-label="Consy layer separation"
+                  aria-label="Cera layer separation"
                   type="range"
                   min={0}
                   max={100}
